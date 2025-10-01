@@ -23,6 +23,8 @@ FROM ${BASE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 
+RUN apk add --no-cache curl
+
 # Copy built output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public

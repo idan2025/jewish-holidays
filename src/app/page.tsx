@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import Countdown from "@/components/Countdown"; // keep if this one is default
-import { Badge } from "../components/Badge";     // named export
-import { ISRAEL_CITIES } from "../lib/israelCities"; // named const (ALL CAPS)
+import { Countdown, Badge } from "../components";
+import { ISRAEL_CITIES } from "../lib";
 import { HDate } from "@hebcal/hdate";
 
 type HebItem = {

@@ -1,79 +1,79 @@
-name: Build & Push Docker image
+name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*', 'release-*' ]
+    branches: ["main"]
+    tags: ["v*", "release-*"]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
 
+# Avoid piling up builds on fast commits
 concurrency:
-  group: docker-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 env:
-  IMAGE_NAME: jewish-holidays
+  NODE_ENV: production
+  DOCKERHUB_REPO: REPO/IMAGE
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (multi-arch)
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
-          tags: |
-            # latest on default branch
-            type=raw,value=latest,enable={{is_default_branch}}
-            # branch name (e.g. main, feature-x)
-            type=ref,event=branch
-            # git tags (e.g. v1.2.3)
-            type=ref,event=tag
-            # short SHA (fallback tag)
-            type=
-      - name: Guard: no next/document or <Html> in repo
+      # ---- Guard step: fail if repo source contains next/document or <Html>
+      # We exclude node_modules and .next; we also allow this workflow file to mention those strings.
+      - name: Guard: no next/document or <Html> in source
         run: |
           set -euo pipefail
-          echo "Scanning repository..."
-          bad1=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next "next/document" . || true)
-          bad2=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next "<Html" . || true)
+          echo "Scanning workspace for forbidden patterns…"
+          bad1=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next \
+                  --exclude='.github/workflows/docker.yml' "next/document" . || true)
+          bad2=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next \
+                  --exclude='.github/workflows/docker.yml' "<Html" . || true)
           if [ -n "$bad1$bad2" ]; then
-            echo "::error::Found forbidden usage:"
-            [ -n "$bad1" ] && echo "$bad1"
-            [ -n "$bad2" ] && echo "$bad2"
+            echo "::error::Found forbidden usage in source files."
+            [ -n "$bad1$bad2" ] && { echo "$bad1"; echo "$bad2"; }
             exit 1
           fi
+          echo "OK: no forbidden patterns in source."
 
-      - name: Build & (conditionally) push
+      - name: Build & Push (multi-arch)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          provenance: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:latest
+            ${{ env.DOCKERHUB_REPO }}:main
+            ${{ env.DOCKERHUB_REPO }}:sha-${{ github.sha }}
+
+      - name: Summarize
+        if: always()
+        run: |
+          echo "Ref:        $GITHUB_REF"
+          echo "Commit:     $GITHUB_SHA"
+          echo "Pushed:     $([[ '${{ github.event_name }}' != 'pull_request' ]] && echo yes || echo no)"

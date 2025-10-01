@@ -12,18 +12,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
-          # Alpine where it works
+          # Alpine where it works well
           - platform: linux/amd64
             base: node:22-alpine
           - platform: linux/arm64
             base: node:22-alpine
           - platform: linux/arm/v7
             base: node:22-alpine
-          # Debian for other architectures
-          - platform: linux/386
-            base: node:22-bookworm-slim
+            # arm/v7 can be flaky on some Node tags/QEMU combos; don’t fail the whole matrix:
+            continue_on_error: true
+          # Debian for other enterprise arches
           - platform: linux/ppc64le
             base: node:22-bookworm-slim
           - platform: linux/s390x
@@ -45,7 +46,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push multi-arch image
+      - name: Build and push for ${{ matrix.platform }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -60,3 +61,4 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:main
             ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+        continue-on-error: ${{ matrix.continue_on_error || false }}

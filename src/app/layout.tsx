@@ -19,6 +19,8 @@ const themeInitScript = `
 export const metadata: Metadata = {
   title: "Jewish Holidays & Timers",
   description: "Hebrew + Gregorian calendar with precise start/end timers",
+  // If you keep icons in /public:
+  // icons: { icon: "/favicon.ico", apple: "/apple-touch-icon.png" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

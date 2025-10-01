@@ -22,11 +22,6 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy the rest of the source
 COPY . .
 
-# (Optional hard guard; remove if you don’t want it here)
-# Fail the image build if someone imports next/document or <Html> in source
-RUN ! grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next -E "next/document|<Html" . || \
-    (echo "Forbidden next/document or <Html> found in source. Use App Router <html> in app/layout.tsx." && exit 1)
-
 # Build Next.js
 RUN npm run build
 

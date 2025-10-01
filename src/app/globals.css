@@ -1,16 +1,80 @@
+/* Tailwind (kept as-is) */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Optional light/dark tweaks */
-:root {
-  color-scheme: light dark;
+/* ---- Minimal fallback styles (work even if Tailwind is missing) ---- */
+
+:root { color-scheme: light dark; }
+html, body { height: 100%; margin: 0; padding: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+.rtl { direction: rtl; }
+
+.container-fallback {
+  max-width: 56rem; /* ~max-w-3xl */
+  margin-inline: auto;
+  padding: 1rem;
+}
+@media (min-width: 768px) {
+  .container-fallback { padding: 2rem; }
 }
 
-html, body {
-  height: 100%;
+.headerbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1.5rem; }
+
+.card {
+  border: 1px solid color-mix(in oklab, CanvasText 15%, transparent);
+  background: color-mix(in oklab, Canvas 96%, transparent);
+  border-radius: 1rem; /* ~rounded-2xl */
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .04);
 }
 
-.rtl {
-  direction: rtl;
+.badges { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
+
+.badge {
+  display: inline-flex; align-items: center;
+  border: 1px solid color-mix(in oklab, CanvasText 15%, transparent);
+  background: color-mix(in oklab, Canvas 96%, transparent);
+  color: CanvasText;
+  border-radius: .375rem; /* rounded-md */
+  padding: .25rem .5rem;  /* px-2 py-1 */
+  font-size: .75rem;      /* text-xs */
+  font-weight: 600;
 }
+
+.controls { display: flex; gap: .5rem; align-items: center; }
+.select, .btn {
+  border: 1px solid color-mix(in oklab, CanvasText 15%, transparent);
+  background: color-mix(in oklab, Canvas 96%, transparent);
+  color: CanvasText;
+  border-radius: .375rem;
+  padding: .375rem .5rem;
+  font-size: .875rem;
+}
+.btn { cursor: pointer; }
+.btn:active { transform: translateY(1px); }
+
+.grid2 {
+  display: grid; grid-template-columns: 1fr; gap: 1rem;
+}
+@media (min-width: 768px) {
+  .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.kv { border: 1px solid color-mix(in oklab, CanvasText 15%, transparent); border-radius: .5rem; padding: .75rem; }
+.kv .label { opacity: .7; font-size: .875rem; margin-bottom: .25rem; }
+.kv .value { font-size: 1.125rem; font-weight: 600; }
+
+.list { display: grid; gap: .5rem; }
+.list-item {
+  border: 1px solid color-mix(in oklab, CanvasText 15%, transparent);
+  border-radius: .5rem; padding: .75rem;
+  display: flex; flex-direction: column;
+}
+@media (min-width: 768px) {
+  .list-item { flex-direction: row; align-items: center; justify-content: space-between; }
+}
+.item-title { font-weight: 600; }
+.item-sub { opacity: .8; font-size: .875rem; }
+
+summary { cursor: pointer; opacity: .7; font-size: .875rem; }
+details { margin-top: .75rem; }

@@ -163,18 +163,19 @@ export default function Home() {
     );
   }, [monthData]);
 
-  const containerClass = `mx-auto max-w-3xl p-4 md:p-8 ${hebrewUI ? "rtl" : ""}`;
+  // Tailwind-first classes + CSS fallbacks (container-fallback / rtl)
+  const containerClass = `container-fallback mx-auto max-w-3xl p-4 md:p-8 ${hebrewUI ? "rtl" : ""}`;
 
   return (
     <main className={containerClass}>
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <header className="headerbar mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl md:text-3xl font-bold">
           {hebrewUI ? "חגים וזמנים — שעונים חיים" : "Jewish Holidays & Timers"}
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="controls flex items-center gap-2">
           {/* City picker */}
           <select
-            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+            className="select rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             value={selectedCity.geonameid}
             onChange={(e) => {
               const city = ISRAEL_CITIES.find(
@@ -196,7 +197,7 @@ export default function Home() {
 
           {/* Timezone (editable) */}
           <select
-            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+            className="select rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             value={tz}
             onChange={(e) => setTz(e.target.value)}
             title="Timezone"
@@ -207,7 +208,7 @@ export default function Home() {
 
           {/* Language toggle */}
           <button
-            className="rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+            className="btn rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             onClick={() => setHebrewUI((v) => !v)}
             title="Toggle language"
           >
@@ -216,7 +217,7 @@ export default function Home() {
 
           {/* Theme toggle */}
           <button
-            className="rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+            className="btn rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             onClick={toggleTheme}
             title="Toggle dark mode"
           >
@@ -226,8 +227,8 @@ export default function Home() {
       </header>
 
       {/* Today card */}
-      <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+      <section className="card mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="badges mb-2 flex flex-wrap items-center gap-2">
           <Badge>{formatInTimeZone(new Date(), tz, "PPP")}</Badge>
           <Badge>{selectedCity.name}</Badge>
           <Badge>{tz}</Badge>
@@ -246,27 +247,27 @@ export default function Home() {
             : "No major holiday today"}
         </p>
 
-        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-            <div className="text-sm opacity-70">
+        <div className="grid2 mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="kv rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="label text-sm opacity-70">
               {hebrewUI
                 ? "התחלה (הדלקת נרות / תחילת צום)"
                 : "Start (Candle lighting / Fast begins)"}
             </div>
-            <div className="text-lg font-medium">
+            <div className="value text-lg font-medium">
               {start ? formatInTimeZone(start, tz, "HH:mm:ss") : "—"}
             </div>
             <div className="text-sm">
               <Countdown target={start} />
             </div>
           </div>
-          <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-            <div className="text-sm opacity-70">
+          <div className="kv rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="label text-sm opacity-70">
               {hebrewUI
                 ? "סיום (הבדלה / סוף צום)"
                 : "End (Havdalah / Fast ends)"}
             </div>
-            <div className="text-lg font-medium">
+            <div className="value text-lg font-medium">
               {end ? formatInTimeZone(end, tz, "HH:mm:ss") : "—"}
             </div>
             <div className="text-sm">
@@ -294,11 +295,11 @@ export default function Home() {
       </section>
 
       {/* Month list */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <section className="card rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="text-xl font-semibold mb-3">
           {hebrewUI ? "החודש" : "This Month"}
         </h2>
-        <ul className="space-y-2">
+        <ul className="list space-y-2">
           {monthData.map((e, i) => {
             const g = new Date(e.date);
             const leftTitle = hebrewUI ? e.hebrew ?? e.title : e.title;
@@ -308,10 +309,10 @@ export default function Home() {
             return (
               <li
                 key={i}
-                className="flex flex-col md:flex-row md:items-center md:justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
+                className="list-item flex flex-col md:flex-row md:items-center md:justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
               >
-                <div className="font-medium">{leftTitle}</div>
-                <div className="text-sm opacity-80">
+                <div className="item-title font-medium">{leftTitle}</div>
+                <div className="item-sub text-sm opacity-80">
                   {rightDateEn}
                   {hebrewUI && rightDateHe ? ` • ${rightDateHe}` : ""}
                 </div>

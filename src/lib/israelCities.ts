@@ -22,10 +22,10 @@ export const ISRAEL_CITIES: IsraelCity[] = [
     tz: "Asia/Jerusalem",
   },
   {
-    geonameid: 2933972,
+    geonameid: 294801,
     name: "Haifa",
     lat: 32.794,
     lon: 34.9896,
     tz: "Asia/Jerusalem",
-  },
+  }
 ];

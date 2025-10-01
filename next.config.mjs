@@ -2,7 +2,10 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
-  experimental: { serverActions: true }
+  // If you need server actions, keep it as an object (not a boolean).
+  experimental: {
+    serverActions: {}
+  }
 };
 
 export default nextConfig;

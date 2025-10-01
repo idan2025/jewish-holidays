@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import Countdown from "@/src/components/Countdown";
-import { Badge } from "@/src/components/Badge";
-import { ISRAEL_CITIES } from "@/src/lib/israelCities";
+import Countdown from "@/components/Countdown"; // keep if this one is default
+import { Badge } from "../components/Badge";     // named export
+import { ISRAEL_CITIES } from "../lib/israelCities"; // named const (ALL CAPS)
 import { HDate } from "@hebcal/hdate";
 
 type HebItem = {
@@ -29,7 +29,6 @@ type HebcalTimes = { items: HebcalTimesItem[] };
 // Helper: Gregorian Date -> Hebrew date label (Hebrew with gematria, no nikud)
 function hebrewDateLabel(d: Date) {
   try {
-    // Treat HDate as an unknown object that may expose these methods
     const hd = new HDate(d) as unknown as {
       renderGematriya?: () => string;
       render?: () => string;
@@ -103,7 +102,9 @@ export default function Home() {
     const root = document.documentElement;
     const next = root.classList.toggle("dark") ? "dark" : "light";
     setTheme(next);
-    try { localStorage.setItem("theme", next); } catch {}
+    try {
+      localStorage.setItem("theme", next);
+    } catch {}
   };
 
   // Try geolocation to auto-pick nearest city

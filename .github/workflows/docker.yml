@@ -28,7 +28,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push multi-arch image (no x86)
+      - name: Build and push multi-arch image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -36,9 +36,7 @@ jobs:
           platforms: |
             linux/amd64,
             linux/arm64,
-            linux/arm/v7,
-            linux/ppc64le,
-            linux/s390x
+            linux/arm/v7
           build-args: |
             BASE_IMAGE=node:22-alpine
           push: true

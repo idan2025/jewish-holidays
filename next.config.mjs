@@ -1,11 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: "standalone",
   reactStrictMode: true,
-  // If you need server actions, keep it as an object (not a boolean).
   experimental: {
-    serverActions: {}
+    serverActions: {} // use object, not boolean
   }
 };
-
 export default nextConfig;

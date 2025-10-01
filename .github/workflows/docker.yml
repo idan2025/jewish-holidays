@@ -52,7 +52,19 @@ jobs:
             # git tags (e.g. v1.2.3)
             type=ref,event=tag
             # short SHA (fallback tag)
-            type=sha
+            type=
+      - name: Guard: no next/document or <Html> in repo
+        run: |
+          set -euo pipefail
+          echo "Scanning repository..."
+          bad1=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next "next/document" . || true)
+          bad2=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next "<Html" . || true)
+          if [ -n "$bad1$bad2" ]; then
+            echo "::error::Found forbidden usage:"
+            [ -n "$bad1" ] && echo "$bad1"
+            [ -n "$bad2" ] && echo "$bad2"
+            exit 1
+          fi
 
       - name: Build & (conditionally) push
         uses: docker/build-push-action@v6

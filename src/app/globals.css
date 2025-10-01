@@ -1,8 +1,16 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Make Tailwind's `dark:` variant use a `.dark` class on <html> */
-@custom-variant dark (&:where(.dark, .dark *)); /* Tailwind v4 */
+/* Optional light/dark tweaks */
+:root {
+  color-scheme: light dark;
+}
 
-/* Existing helpers */
-html, body { height: 100%; }
-.rtl { direction: rtl; }
+html, body {
+  height: 100%;
+}
+
+.rtl {
+  direction: rtl;
+}

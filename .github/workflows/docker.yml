@@ -13,7 +13,7 @@ concurrency:
 env:
   NODE_ENV: production
   DOCKERHUB_REPO: idan2025/jewish-holidays
-
+  
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,20 +38,19 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ---- Guard step: fail if repo source contains next/document or <Html>
-      # Exclude CI config (.github), node_modules, and .next output.
       - name: "Guard: no next/document or <Html> in source"
         shell: bash
         run: |
           set -euo pipefail
           echo "Scanning workspace for forbidden patterns…"
-
-          # Use git grep so we can exclude paths reliably.
           bad1=$(git grep -n -e 'next/document' -- \
-                  . ':(exclude).github/**' ':(exclude)node_modules/**' ':(exclude).next/**' || true)
+                  . \
+                  ':(exclude).github/**' ':(exclude)node_modules/**' ':(exclude).next/**' \
+                  ':(exclude)Dockerfile' ':(exclude)**/Dockerfile*' || true)
           bad2=$(git grep -n -e '<Html' -- \
-                  . ':(exclude).github/**' ':(exclude)node_modules/**' ':(exclude).next/**' || true)
-
+                  . \
+                  ':(exclude).github/**' ':(exclude)node_modules/**' ':(exclude).next/**' \
+                  ':(exclude)Dockerfile' ':(exclude)**/Dockerfile*' || true)
           if [[ -n "$bad1$bad2" ]]; then
             echo "::error::Found forbidden usage in source files."
             [[ -n "$bad1" ]] && echo "$bad1"

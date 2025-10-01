@@ -1,6 +1,20 @@
-export function Badge({ children }: { children: React.ReactNode }) {
+import React from "react";
+
+type BadgeProps = {
+  children: React.ReactNode;
+  className?: string;
+};
+
+export function Badge({ children, className = "" }: BadgeProps) {
   return (
-    <span className="inline-block rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
+    <span
+      className={
+        "inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium " +
+        "border-zinc-200 bg-zinc-50 text-zinc-900 " +
+        "dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 " +
+        className
+      }
+    >
       {children}
     </span>
   );

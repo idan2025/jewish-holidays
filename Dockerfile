@@ -1,45 +1,47 @@
-# -------- Base image for all stages --------
-FROM node:22-alpine AS base
-# sharp sometimes needs this on Alpine
-RUN apk add --no-cache libc6-compat
-ENV NEXT_TELEMETRY_DISABLED=1
+# syntax=docker/dockerfile:1.7
 
-# -------- Dependencies stage (uses npm ci) --------
+# -------- Base --------
+FROM node:22-alpine AS base
+RUN apk add --no-cache libc6-compat
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
+
+# -------- Deps (install dev deps for build) --------
 FROM base AS deps
 WORKDIR /app
-# Copy only package files for better caching
 COPY package.json package-lock.json* ./
-# If you use npm 11, lockfile name is package-lock.json (still fine)
 RUN npm ci
 
-# -------- Build stage --------
+# -------- Build --------
 FROM base AS builder
 WORKDIR /app
-ENV NODE_ENV=development
-# Copy node_modules from deps
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+
+# Bring in node_modules from deps
 COPY --from=deps /app/node_modules ./node_modules
 # Copy the rest of the source
 COPY . .
-# Build the Next.js app (your script currently uses Turbopack; that's fine)
+
+# (Optional hard guard; remove if you don’t want it here)
+# Fail the image build if someone imports next/document or <Html> in source
+RUN ! grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next -E "next/document|<Html" . || \
+    (echo "Forbidden next/document or <Html> found in source. Use App Router <html> in app/layout.tsx." && exit 1)
+
+# Build Next.js
 RUN npm run build
 
-# -------- Runtime (tiny) --------
+# -------- Runtime (tiny, standalone) --------
 FROM base AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user (node user already exists in the image)
-USER node
+# If using output: 'standalone', we can run with the minimal bundle:
+#  - .next/standalone contains server code + node_modules subset
+#  - .next/static and public are needed for assets
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/static ./.next/static
 
-# Copy standalone server and static assets
-# The standalone output contains the server and minimal node_modules
-COPY --chown=node:node --from=builder /app/.next/standalone ./ 
-COPY --chown=node:node --from=builder /app/.next/static ./.next/static
-COPY --chown=node:node --from=builder /app/public ./public
-
-# If you have a /src/app/icon.png or favicon in /public, they’re included above.
-
+# Default Next.js port
 EXPOSE 3000
 CMD ["node", "server.js"]

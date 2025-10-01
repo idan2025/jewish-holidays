@@ -29,11 +29,13 @@ type HebcalTimes = { items: HebcalTimesItem[] };
 // Helper: Gregorian Date -> Hebrew date label (Hebrew with gematria, no nikud)
 function hebrewDateLabel(d: Date) {
   try {
-    const hd: any = new HDate(d); // cast once; avoid ts-ignore
-    const heb = (typeof hd.renderGematriya === "function"
-      ? hd.renderGematriya()
-      : (typeof hd.render === "function" ? hd.render() : "")) as string;
-    return heb || "";
+    // Treat HDate as an unknown object that may expose these methods
+    const hd = new HDate(d) as unknown as {
+      renderGematriya?: () => string;
+      render?: () => string;
+    };
+    const out = hd.renderGematriya?.() ?? hd.render?.() ?? "";
+    return typeof out === "string" ? out : "";
   } catch {
     return "";
   }

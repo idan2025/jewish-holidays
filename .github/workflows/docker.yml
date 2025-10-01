@@ -6,7 +6,6 @@ on:
     tags: ["v*", "release-*"]
   pull_request:
 
-# Avoid piling up builds on fast commits
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,18 +39,23 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # ---- Guard step: fail if repo source contains next/document or <Html>
-      # We exclude node_modules and .next; we also allow this workflow file to mention those strings.
+      # Exclude CI config (.github), node_modules, and .next output.
       - name: "Guard: no next/document or <Html> in source"
+        shell: bash
         run: |
           set -euo pipefail
           echo "Scanning workspace for forbidden patterns…"
-          bad1=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next \
-                  --exclude='.github/workflows/docker.yml' "next/document" . || true)
-          bad2=$(grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next \
-                  --exclude='.github/workflows/docker.yml' "<Html" . || true)
-          if [ -n "$bad1$bad2" ]; then
+
+          # Use git grep so we can exclude paths reliably.
+          bad1=$(git grep -n -e 'next/document' -- \
+                  . ':(exclude).github/**' ':(exclude)node_modules/**' ':(exclude).next/**' || true)
+          bad2=$(git grep -n -e '<Html' -- \
+                  . ':(exclude).github/**' ':(exclude)node_modules/**' ':(exclude).next/**' || true)
+
+          if [[ -n "$bad1$bad2" ]]; then
             echo "::error::Found forbidden usage in source files."
-            [ -n "$bad1$bad2" ] && { echo "$bad1"; echo "$bad2"; }
+            [[ -n "$bad1" ]] && echo "$bad1"
+            [[ -n "$bad2" ]] && echo "$bad2"
             exit 1
           fi
           echo "OK: no forbidden patterns in source."
@@ -73,6 +77,7 @@ jobs:
 
       - name: Summarize
         if: always()
+        shell: bash
         run: |
           echo "Ref:        $GITHUB_REF"
           echo "Commit:     $GITHUB_SHA"

@@ -13,7 +13,7 @@ concurrency:
 
 env:
   NODE_ENV: production
-  DOCKERHUB_REPO: REPO/IMAGE
+  DOCKERHUB_REPO: idan2025/jewish-holidays
 
 jobs:
   build:
@@ -41,7 +41,7 @@ jobs:
 
       # ---- Guard step: fail if repo source contains next/document or <Html>
       # We exclude node_modules and .next; we also allow this workflow file to mention those strings.
-      - name: Guard: no next/document or <Html> in source
+      - name: "Guard: no next/document or <Html> in source"
         run: |
           set -euo pipefail
           echo "Scanning workspace for forbidden patterns…"

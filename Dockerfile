@@ -42,7 +42,7 @@ RUN if command -v apk >/dev/null 2>&1; then apk add --no-cache libc6-compat || t
 EXPOSE 3000
 
 # ✅ Add healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3
   CMD curl -f http://localhost:3000/ || exit 1
 
 CMD ["node", "server.js"]

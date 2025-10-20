@@ -91,20 +91,51 @@ export default function Home() {
   const [hebrewUI, setHebrewUI] = useState<boolean>(false);
 
   // THEME: 'light' | 'dark'
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  useEffect(() => {
-    const root = document.documentElement;
-    const isDark = root.classList.contains("dark");
-    setTheme(isDark ? "dark" : "light");
-  }, []);
-  const toggleTheme = () => {
-    const root = document.documentElement;
-    const next = root.classList.toggle("dark") ? "dark" : "light";
-    setTheme(next);
-    try {
-      localStorage.setItem("theme", next);
-    } catch {}
-  };
+const [theme, setTheme] = useState<"light" | "dark">("light");
+
+const applyTheme = (mode: "light" | "dark") => {
+  const html = document.documentElement;
+  const body = document.body;
+
+  // Remove any lingering classes first
+  html.classList.remove("dark");
+  body.classList.remove("dark");
+
+  // Apply explicitly
+  if (mode === "dark") {
+    html.classList.add("dark");
+    body.classList.add("dark");
+  }
+
+  // Hint UA & some CSS resets
+  html.style.colorScheme = mode;
+  const meta = document.querySelector('meta[name="color-scheme"]') as HTMLMetaElement | null;
+  if (meta) meta.content = mode;
+};
+
+useEffect(() => {
+  try {
+    const stored = (localStorage.getItem("theme") as "light" | "dark" | null) || null;
+    const prefersDark =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    const initial = stored ?? (prefersDark ? "dark" : "light");
+    setTheme(initial);
+    applyTheme(initial);
+  } catch {}
+}, []);
+
+const toggleTheme = () => {
+  const next = theme === "dark" ? "light" : "dark";
+  setTheme(next);
+  try {
+    localStorage.setItem("theme", next);
+  } catch {}
+  applyTheme(next);
+};
+
 
   // Try geolocation to auto-pick nearest city
   useEffect(() => {

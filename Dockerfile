@@ -15,9 +15,9 @@ RUN npm ci
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Disable Turbo for ARM builds to avoid wasm binding issues
-ENV NEXT_USE_TURBO=false
-RUN npm run build
+# Force webpack build instead of Turbopack to support ARM platforms
+# Next.js 16 Turbopack has wasm binding issues on ARM architectures
+RUN npx next build --webpack
 
 # ---------- Runtime ----------
 FROM ${BASE_IMAGE} AS runner

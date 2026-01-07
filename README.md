@@ -25,6 +25,8 @@ Hebrew (no nikud) UI → Hebrew titles + Hebrew date (gematria), RTL
 
 🔒 Privacy-friendly (no user data stored; location stays client-side)
 
+🛡️ Security: Automated vulnerability scanning with npm audit, Trivy, and CodeQL
+
 Tech Stack
 
 Frontend/SSR: Next.js 15 (App Router), React 19, TypeScript
@@ -178,6 +180,57 @@ In globals.css, import Tailwind v4:
 
 
 Timers show “—”: There may be no upcoming candle/fast/havdalah event for the current day/time in the selected city, or the date is a weekday without events.
+
+Security
+
+This project implements multiple layers of security scanning to prevent vulnerabilities like CVE-2025-55182 and CVE-2025-66478:
+
+### Automated Security Scanning
+
+**Dependency Scanning:**
+- `npm audit` runs on every build
+- Fails CI/CD pipeline on critical or high severity vulnerabilities
+- Weekly Dependabot PRs for dependency updates
+
+**Docker Image Scanning:**
+- Trivy scans all Docker images before deployment
+- Checks for OS and application vulnerabilities
+- Results uploaded to GitHub Security tab
+
+**Code Analysis:**
+- CodeQL automated code scanning
+- Runs weekly and on all pull requests
+- Identifies security vulnerabilities in source code
+
+### Running Security Scans Locally
+
+```bash
+# Check npm dependencies for vulnerabilities
+npm audit
+
+# Fix vulnerabilities automatically (when possible)
+npm audit fix
+
+# Scan Docker image with Trivy (requires Trivy installed)
+docker build -t jewish-holidays:scan .
+trivy image jewish-holidays:scan
+```
+
+### Security Policy
+
+See [SECURITY.md](.github/SECURITY.md) for:
+- Supported versions
+- How to report vulnerabilities
+- Security incident history
+- Response timelines
+
+### GitHub Actions Workflows
+
+1. **docker.yml** - Scans dependencies and Docker images on every push to main
+2. **security-scan.yml** - Weekly comprehensive security scanning
+3. **dependabot.yml** - Automated dependency updates
+
+All workflows fail if critical or high severity vulnerabilities are detected.
 
 Roadmap
 

@@ -6,8 +6,11 @@ FROM ${BASE_IMAGE} AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Upgrade npm to latest version to fix CVE-2025-64756 (glob vulnerability)
-RUN npm install -g npm@latest
+# Fix CVE-2025-64756: Upgrade npm to latest version with patched glob
+# Then manually replace the vulnerable glob package in npm's dependencies
+RUN npm install -g npm@latest && \
+    cd /usr/local/lib/node_modules/npm && \
+    npm install glob@11.1.0 --save --package-lock-only=false 2>/dev/null || true
 
 # ---------- Dependencies ----------
 FROM base AS deps

@@ -2,8 +2,6 @@
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  experimental: {
-    serverActions: {} // use object, not boolean
-  }
+  // serverActions is now stable in Next.js 16, no need for experimental flag
 };
 export default nextConfig;

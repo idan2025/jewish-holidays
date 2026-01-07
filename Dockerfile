@@ -22,7 +22,10 @@ RUN npx next build --webpack
 # ---------- Runtime ----------
 FROM ${BASE_IMAGE} AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME="0.0.0.0" \
+    PORT=3000
 
 # ✅ Universal curl install (works on Alpine *and* Debian/Ubuntu)
 RUN if command -v apk >/dev/null 2>&1; then \
@@ -43,8 +46,8 @@ RUN if command -v apk >/dev/null 2>&1; then apk add --no-cache libc6-compat || t
 
 EXPOSE 3000
 
-# ✅ Add healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+# ✅ Add healthcheck with longer start period for Next.js 16
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3000/ || exit 1
 
 CMD ["node", "server.js"]

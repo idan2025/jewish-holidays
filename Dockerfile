@@ -15,6 +15,8 @@ RUN npm ci
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Disable Turbo for ARM builds to avoid wasm binding issues
+ENV NEXT_USE_TURBO=false
 RUN npm run build
 
 # ---------- Runtime ----------

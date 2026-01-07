@@ -1,0 +1,21 @@
+{
+  "name": "Jewish Holidays & Timers",
+  "short_name": "JH Timer",
+  "description": "Track Jewish holidays, Shabbat times, and Zmanim with live countdowns",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "512x512",
+      "type": "image/x-icon",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "utilities"],
+  "lang": "en-US",
+  "dir": "ltr"
+}

@@ -1,9 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import { Countdown, Badge } from "../components";
-import { ISRAEL_CITIES } from "../lib";
+import {
+  Countdown,
+  Badge,
+  LoadingSpinner,
+  ErrorMessage,
+  SkeletonCard,
+} from "../components";
+import {
+  ISRAEL_CITIES,
+  generateICS,
+  downloadICS,
+  requestNotificationPermission,
+  notifyUpcoming,
+  shareHoliday,
+} from "../lib";
 import { HDate } from "@hebcal/hdate";
 
 type HebItem = {
@@ -11,7 +24,8 @@ type HebItem = {
   date: string;
   hdate?: string;
   category?: string;
-  hebrew?: string; // localized title when lg=he-x-NoNikud
+  hebrew?: string;
+  memo?: string;
 };
 
 type HebcalHolidays = { items: HebItem[] };
@@ -25,7 +39,27 @@ type HebcalTimesItem = {
 
 type HebcalTimes = { items: HebcalTimesItem[] };
 
-// Helper: Gregorian Date -> Hebrew date label (Hebrew with gematria, no nikud)
+type Zmanim = {
+  times: {
+    sunrise?: string;
+    sunset?: string;
+    dawn?: string;
+    dusk?: string;
+    alotHaShachar?: string;
+    misheyakir?: string;
+    sofZmanShma?: string;
+    sofZmanTfilla?: string;
+    chatzot?: string;
+    minchaGedola?: string;
+    minchaKetana?: string;
+    plagHaMincha?: string;
+    tzeit?: string;
+  };
+  location: {
+    title?: string;
+  };
+};
+
 function hebrewDateLabel(d: Date) {
   try {
     const hd = new HDate(d) as unknown as {
@@ -39,7 +73,6 @@ function hebrewDateLabel(d: Date) {
   }
 }
 
-// Robust language-agnostic start/end picker
 function pickStartEnd(
   items: HebcalTimesItem[],
   now: Date,
@@ -50,9 +83,8 @@ function pickStartEnd(
     .sort((a, b) => +a.when - +b.when);
 
   const upcoming = parsed.filter((i) => +i.when > +now);
-  const text = (i: HebcalTimesItem) => (i.hebrew ?? i.title ?? "");
+  const text = (i: HebcalTimesItem) => i.hebrew ?? i.title ?? "";
 
-  // Regex for fast begin/end in both languages (no nikud Hebrew)
   const fastBeginRe = hebrewUI
     ? /(תחילת|תחלת)\s*צום|צום\s*מתחיל/i
     : /fast\s*begins?/i;
@@ -62,10 +94,12 @@ function pickStartEnd(
     : /fast\s*ends?/i;
 
   const isStart = (i: HebcalTimesItem) =>
-    i.category === "candles" || (i.category === "fast" && fastBeginRe.test(text(i)));
+    i.category === "candles" ||
+    (i.category === "fast" && fastBeginRe.test(text(i)));
 
   const isEnd = (i: HebcalTimesItem) =>
-    i.category === "havdalah" || (i.category === "fast" && fastEndRe.test(text(i)));
+    i.category === "havdalah" ||
+    (i.category === "fast" && fastEndRe.test(text(i)));
 
   const startItem = upcoming.find(isStart) ?? parsed.find(isStart) ?? null;
   const endItem = upcoming.find(isEnd) ?? parsed.find(isEnd) ?? null;
@@ -86,116 +120,214 @@ export default function Home() {
   const [times, setTimes] = useState<HebcalTimesItem[]>([]);
   const [start, setStart] = useState<Date | null>(null);
   const [end, setEnd] = useState<Date | null>(null);
+  const [zmanim, setZmanim] = useState<Zmanim | null>(null);
+  const [parashat, setParashat] = useState<string | null>(null);
 
-  // UI language: false = English, true = Hebrew (no nikud)
   const [hebrewUI, setHebrewUI] = useState<boolean>(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  // THEME: 'light' | 'dark'
-const [theme, setTheme] = useState<"light" | "dark">("light");
+  // Loading and error states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-const applyTheme = (mode: "light" | "dark") => {
-  const html = document.documentElement;
-  const body = document.body;
+  const applyTheme = useCallback((mode: "light" | "dark") => {
+    const html = document.documentElement;
+    const body = document.body;
 
-  // Remove any lingering classes first
-  html.classList.remove("dark");
-  body.classList.remove("dark");
+    html.classList.remove("dark");
+    body.classList.remove("dark");
 
-  // Apply explicitly
-  if (mode === "dark") {
-    html.classList.add("dark");
-    body.classList.add("dark");
-  }
+    if (mode === "dark") {
+      html.classList.add("dark");
+      body.classList.add("dark");
+    }
 
-  // Hint UA & some CSS resets
-  html.style.colorScheme = mode;
-  const meta = document.querySelector('meta[name="color-scheme"]') as HTMLMetaElement | null;
-  if (meta) meta.content = mode;
-};
+    html.style.colorScheme = mode;
+    const meta = document.querySelector(
+      'meta[name="color-scheme"]'
+    ) as HTMLMetaElement | null;
+    if (meta) meta.content = mode;
+  }, []);
 
-useEffect(() => {
-  try {
-    const stored = (localStorage.getItem("theme") as "light" | "dark" | null) || null;
-    const prefersDark =
-      typeof window !== "undefined" &&
-      window.matchMedia &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches;
+  useEffect(() => {
+    try {
+      const stored =
+        (localStorage.getItem("theme") as "light" | "dark" | null) || null;
+      const prefersDark =
+        typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
 
-    const initial = stored ?? (prefersDark ? "dark" : "light");
-    setTheme(initial);
-    applyTheme(initial);
-  } catch {}
-}, []);
+      const initial = stored ?? (prefersDark ? "dark" : "light");
+      setTheme(initial);
+      applyTheme(initial);
+    } catch {}
+  }, [applyTheme]);
 
-const toggleTheme = () => {
-  const next = theme === "dark" ? "light" : "dark";
-  setTheme(next);
-  try {
-    localStorage.setItem("theme", next);
-  } catch {}
-  applyTheme(next);
-};
+  const toggleTheme = useCallback(() => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try {
+      localStorage.setItem("theme", next);
+    } catch {}
+    applyTheme(next);
+  }, [theme, applyTheme]);
 
+  // Request notification permission
+  useEffect(() => {
+    requestNotificationPermission().then(setNotificationsEnabled);
+  }, []);
 
-  // Try geolocation to auto-pick nearest city
+  // Geolocation
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (p) => {
         const { latitude, longitude } = p.coords;
-        const nearest =
-          ISRAEL_CITIES.map((c) => ({
-            c,
-            d: Math.hypot(c.lat - latitude, c.lon - longitude),
-          })).sort((a, b) => a.d - b.d)[0]?.c;
+        const nearest = ISRAEL_CITIES.map((c) => ({
+          c,
+          d: Math.hypot(c.lat - latitude, c.lon - longitude),
+        })).sort((a, b) => a.d - b.d)[0]?.c;
         if (nearest) {
           setSelectedCity(nearest);
           setTz(nearest.tz);
         }
       },
-      () => {} // ignore denied
+      () => {}
     );
   }, []);
 
-  // Fetch month holidays & today’s times for the chosen city.
-  // Language is enforced via lg=en or lg=he-x-NoNikud
-  useEffect(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const lg = hebrewUI ? "he-x-NoNikud" : "en";
+  // Fetch data
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    (async () => {
-      const holidaysRes = await fetch(
-        `/api/holidays?year=${year}&month=${month}&geonameid=${selectedCity.geonameid}&lg=${lg}`
-      );
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const lg = hebrewUI ? "he-x-NoNikud" : "en";
+
+      const [holidaysRes, timesRes, zmanimRes] = await Promise.all([
+        fetch(
+          `/api/holidays?year=${year}&month=${month}&geonameid=${selectedCity.geonameid}&lg=${lg}`
+        ),
+        fetch(`/api/times?geonameid=${selectedCity.geonameid}&lg=${lg}`),
+        fetch(`/api/zmanim?geonameid=${selectedCity.geonameid}&date=now`),
+      ]);
+
+      if (!holidaysRes.ok || !timesRes.ok) {
+        throw new Error("Failed to fetch data");
+      }
+
       const holidays: HebcalHolidays = await holidaysRes.json();
+      const timesJson: HebcalTimes = await timesRes.json();
+      const zmanimJson: Zmanim = zmanimRes.ok ? await zmanimRes.json() : null;
+
       setMonthData(holidays.items || []);
 
-      const timesRes = await fetch(
-        `/api/times?geonameid=${selectedCity.geonameid}&lg=${lg}`
-      );
-      const timesJson: HebcalTimes = await timesRes.json();
       const items = (timesJson.items || []) as HebcalTimesItem[];
       setTimes(items);
 
       const { start, end } = pickStartEnd(items, new Date(), hebrewUI);
       setStart(start);
       setEnd(end);
-    })();
+
+      setZmanim(zmanimJson);
+
+      // Find Parashat Hashavua
+      const parasha = items.find((i) => i.category === "parashat");
+      setParashat(
+        parasha ? (hebrewUI ? parasha.hebrew ?? parasha.title : parasha.title) : null
+      );
+
+      setLoading(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load data"
+      );
+      setLoading(false);
+    }
   }, [selectedCity, hebrewUI]);
 
-  // Pick today's holiday (language-agnostic by category)
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Notify 15 minutes before events
+  useEffect(() => {
+    if (!notificationsEnabled || !start) return;
+
+    const now = new Date().getTime();
+    const timeUntil = start.getTime() - now;
+    const fifteenMinutes = 15 * 60 * 1000;
+
+    if (timeUntil > fifteenMinutes && timeUntil < fifteenMinutes + 60000) {
+      notifyUpcoming(
+        hebrewUI ? "זמן הדלקת נרות מתקרב" : "Candle lighting approaching",
+        15
+      );
+    }
+  }, [start, notificationsEnabled, hebrewUI]);
+
   const todayHoliday = useMemo(() => {
     const iso = new Date().toISOString().slice(0, 10);
     return monthData.find(
       (it) =>
-        it.date?.startsWith(iso) &&
-        /holiday|fast|חג|צום/i.test(it.category || "")
+        it.date?.startsWith(iso) && /holiday|fast|חג|צום/i.test(it.category || "")
     );
   }, [monthData]);
 
-  // Tailwind-first classes + CSS fallbacks (container-fallback / rtl)
-  const containerClass = `container-fallback mx-auto max-w-3xl p-4 md:p-8 ${hebrewUI ? "rtl" : ""}`;
+  const handleExport = useCallback(
+    (holiday: HebItem) => {
+      const title = hebrewUI ? holiday.hebrew ?? holiday.title : holiday.title;
+      const ics = generateICS(
+        title,
+        new Date(holiday.date),
+        null,
+        holiday.memo,
+        selectedCity.name
+      );
+      downloadICS(ics, `${title.replace(/\s+/g, "_")}.ics`);
+    },
+    [hebrewUI, selectedCity.name]
+  );
+
+  const handleShare = useCallback(
+    async (holiday: HebItem) => {
+      const title = hebrewUI ? holiday.hebrew ?? holiday.title : holiday.title;
+      const text = formatInTimeZone(new Date(holiday.date), tz, "PPP");
+      const success = await shareHoliday(title, text);
+      if (!success) {
+        alert(hebrewUI ? "הועתק ללוח" : "Copied to clipboard");
+      }
+    },
+    [hebrewUI, tz]
+  );
+
+  const containerClass = `container-fallback mx-auto max-w-3xl p-4 md:p-8 ${
+    hebrewUI ? "rtl" : ""
+  }`;
+
+  if (loading) {
+    return (
+      <main className={containerClass}>
+        <div className="flex justify-center items-center min-h-screen">
+          <LoadingSpinner size="lg" />
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className={containerClass}>
+        <div className="flex justify-center items-center min-h-screen">
+          <ErrorMessage message={error} onRetry={fetchData} hebrewUI={hebrewUI} />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={containerClass}>
@@ -204,7 +336,6 @@ const toggleTheme = () => {
           {hebrewUI ? "חגים וזמנים — שעונים חיים" : "Jewish Holidays & Timers"}
         </h1>
         <div className="controls flex items-center gap-2">
-          {/* City picker */}
           <select
             className="select rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             value={selectedCity.geonameid}
@@ -218,6 +349,7 @@ const toggleTheme = () => {
               }
             }}
             title={hebrewUI ? "בחר עיר" : "Choose city"}
+            aria-label={hebrewUI ? "בחירת עיר" : "City selection"}
           >
             {ISRAEL_CITIES.map((c) => (
               <option key={c.geonameid} value={c.geonameid}>
@@ -226,46 +358,59 @@ const toggleTheme = () => {
             ))}
           </select>
 
-          {/* Timezone (editable) */}
           <select
             className="select rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             value={tz}
             onChange={(e) => setTz(e.target.value)}
             title="Timezone"
+            aria-label="Timezone selection"
           >
             <option value={selectedCity.tz}>{selectedCity.tz}</option>
             <option value="UTC">UTC</option>
           </select>
 
-          {/* Language toggle */}
           <button
             className="btn rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             onClick={() => setHebrewUI((v) => !v)}
-            title="Toggle language"
+            title={hebrewUI ? "החלף לאנגלית" : "Switch to Hebrew"}
+            aria-label={hebrewUI ? "החלף לאנגלית" : "Toggle language"}
           >
             {hebrewUI ? "EN" : "עברית"}
           </button>
 
-          {/* Theme toggle */}
           <button
             className="btn rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
             onClick={toggleTheme}
-            title="Toggle dark mode"
+            title={theme === "dark" ? "מצב בהיר" : "Dark mode"}
+            aria-label={`Toggle ${theme === "dark" ? "light" : "dark"} mode`}
           >
             {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
           </button>
         </div>
       </header>
 
+      {/* Parashat Hashavua */}
+      {parashat && (
+        <div className="mb-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 p-3">
+          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+            {hebrewUI ? "פרשת השבוע: " : "This week's Parasha: "}
+            <span className="font-bold">{parashat}</span>
+          </p>
+        </div>
+      )}
+
       {/* Today card */}
-      <section className="card mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <section
+        className="card mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        aria-labelledby="today-heading"
+      >
         <div className="badges mb-2 flex flex-wrap items-center gap-2">
           <Badge>{formatInTimeZone(new Date(), tz, "PPP")}</Badge>
           <Badge>{selectedCity.name}</Badge>
           <Badge>{tz}</Badge>
         </div>
 
-        <h2 className="text-xl font-semibold mb-2">
+        <h2 id="today-heading" className="text-xl font-semibold mb-2">
           {hebrewUI ? "היום" : "Today"}
         </h2>
         <p className="mb-2">
@@ -325,9 +470,80 @@ const toggleTheme = () => {
         </details>
       </section>
 
+      {/* Zmanim section */}
+      {zmanim?.times && (
+        <section
+          className="card mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+          aria-labelledby="zmanim-heading"
+        >
+          <h2 id="zmanim-heading" className="text-xl font-semibold mb-3">
+            {hebrewUI ? "זמנים" : "Zmanim (Prayer Times)"}
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {zmanim.times.sunrise && (
+              <div className="text-sm">
+                <span className="opacity-70">{hebrewUI ? "נץ החמה:" : "Sunrise:"}</span>
+                <br />
+                <span className="font-medium">
+                  {formatInTimeZone(new Date(zmanim.times.sunrise), tz, "HH:mm")}
+                </span>
+              </div>
+            )}
+            {zmanim.times.sunset && (
+              <div className="text-sm">
+                <span className="opacity-70">{hebrewUI ? "שקיעה:" : "Sunset:"}</span>
+                <br />
+                <span className="font-medium">
+                  {formatInTimeZone(new Date(zmanim.times.sunset), tz, "HH:mm")}
+                </span>
+              </div>
+            )}
+            {zmanim.times.alotHaShachar && (
+              <div className="text-sm">
+                <span className="opacity-70">{hebrewUI ? "עלות השחר:" : "Alot HaShachar:"}</span>
+                <br />
+                <span className="font-medium">
+                  {formatInTimeZone(new Date(zmanim.times.alotHaShachar), tz, "HH:mm")}
+                </span>
+              </div>
+            )}
+            {zmanim.times.sofZmanShma && (
+              <div className="text-sm">
+                <span className="opacity-70">{hebrewUI ? "סוף זמן ק\"ש:" : "Latest Shema:"}</span>
+                <br />
+                <span className="font-medium">
+                  {formatInTimeZone(new Date(zmanim.times.sofZmanShma), tz, "HH:mm")}
+                </span>
+              </div>
+            )}
+            {zmanim.times.sofZmanTfilla && (
+              <div className="text-sm">
+                <span className="opacity-70">{hebrewUI ? "סוף זמן תפילה:" : "Latest Tefilla:"}</span>
+                <br />
+                <span className="font-medium">
+                  {formatInTimeZone(new Date(zmanim.times.sofZmanTfilla), tz, "HH:mm")}
+                </span>
+              </div>
+            )}
+            {zmanim.times.tzeit && (
+              <div className="text-sm">
+                <span className="opacity-70">{hebrewUI ? "צאת הכוכבים:" : "Nightfall:"}</span>
+                <br />
+                <span className="font-medium">
+                  {formatInTimeZone(new Date(zmanim.times.tzeit), tz, "HH:mm")}
+                </span>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Month list */}
-      <section className="card rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-xl font-semibold mb-3">
+      <section
+        className="card rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        aria-labelledby="month-heading"
+      >
+        <h2 id="month-heading" className="text-xl font-semibold mb-3">
           {hebrewUI ? "החודש" : "This Month"}
         </h2>
         <ul className="list space-y-2">
@@ -340,12 +556,30 @@ const toggleTheme = () => {
             return (
               <li
                 key={i}
-                className="list-item flex flex-col md:flex-row md:items-center md:justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
+                className="list-item flex flex-col md:flex-row md:items-center md:justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800 gap-2"
               >
-                <div className="item-title font-medium">{leftTitle}</div>
-                <div className="item-sub text-sm opacity-80">
-                  {rightDateEn}
-                  {hebrewUI && rightDateHe ? ` • ${rightDateHe}` : ""}
+                <div className="item-title font-medium flex-1">{leftTitle}</div>
+                <div className="flex items-center gap-2">
+                  <div className="item-sub text-sm opacity-80">
+                    {rightDateEn}
+                    {hebrewUI && rightDateHe ? ` • ${rightDateHe}` : ""}
+                  </div>
+                  <button
+                    onClick={() => handleExport(e)}
+                    className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
+                    title={hebrewUI ? "ייצא ליומן" : "Export to calendar"}
+                    aria-label={`${hebrewUI ? "ייצא" : "Export"} ${leftTitle}`}
+                  >
+                    📅
+                  </button>
+                  <button
+                    onClick={() => handleShare(e)}
+                    className="text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
+                    title={hebrewUI ? "שתף" : "Share"}
+                    aria-label={`${hebrewUI ? "שתף" : "Share"} ${leftTitle}`}
+                  >
+                    🔗
+                  </button>
                 </div>
               </li>
             );
